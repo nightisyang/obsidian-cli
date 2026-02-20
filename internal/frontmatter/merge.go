@@ -9,6 +9,7 @@ import (
 )
 
 type Data struct {
+	Title     string
 	Tags      []string
 	CreatedAt *time.Time
 	UpdatedAt *time.Time
@@ -22,6 +23,8 @@ func MapToFrontmatter(values map[string]any) Data {
 	fm := Data{Extra: map[string]any{}}
 	for k, v := range values {
 		switch k {
+		case "title":
+			fm.Title = toString(v)
 		case "tags":
 			fm.Tags = toStringSlice(v)
 		case "kind":
@@ -52,6 +55,9 @@ func FrontmatterToMap(fm Data) map[string]any {
 	out := map[string]any{}
 	for k, v := range fm.Extra {
 		out[k] = v
+	}
+	if fm.Title != "" {
+		out["title"] = fm.Title
 	}
 	if len(fm.Tags) > 0 {
 		out["tags"] = dedupeStrings(fm.Tags)

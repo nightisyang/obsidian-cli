@@ -35,6 +35,7 @@ func Create(vaultRoot string, in CreateInput) (Note, error) {
 		Path:  normalized,
 		Title: title,
 		Frontmatter: Frontmatter{
+			Title:  title,
 			Tags:   dedupeStrings(in.Tags),
 			Kind:   in.Kind,
 			Topic:  in.Topic,

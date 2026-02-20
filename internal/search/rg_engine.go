@@ -24,7 +24,9 @@ func (e *RGEngine) Search(ctx context.Context, q Query) ([]SearchResult, error) 
 		return nil, err
 	}
 	if _, err := exec.LookPath("rg"); err != nil {
-		return nil, errs.New(errs.ExitGeneric, "ripgrep (rg) is required for text search; install ripgrep and ensure `rg` is on PATH")
+		// rg not available — fall back to stdlib engine.
+		fb := &StdlibEngine{VaultRoot: e.VaultRoot}
+		return fb.Search(ctx, q)
 	}
 
 	args := []string{"--json", "--line-number", "--glob", "*.md"}

@@ -35,9 +35,50 @@ func ParseDocument(raw string) (map[string]any, string, bool, error) {
 
 	result := map[string]any{}
 	if strings.TrimSpace(yamlPart) != "" {
-		if err := yaml.Unmarshal([]byte(yamlPart), &result); err != nil {
-			return nil, "", false, err
+		sanitized := sanitizeYAML(yamlPart)
+		if err := yaml.Unmarshal([]byte(sanitized), &result); err != nil {
+			// Malformed frontmatter: treat as no frontmatter rather than failing.
+			// Callers should still be able to read/list the note.
+			return map[string]any{}, body, false, nil
 		}
 	}
 	return result, body, true, nil
+}
+
+// sanitizeYAML normalizes common Obsidian conventions that are technically
+// invalid YAML. Specifically, tags like [#tag1, #tag2] use '#' which the YAML
+// spec treats as a comment when preceded by whitespace. We strip the '#'
+// prefix from values inside flow sequences so the YAML parses correctly.
+func sanitizeYAML(yamlPart string) string {
+	lines := strings.Split(yamlPart, "\n")
+	for i, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), "tags:") {
+			lines[i] = sanitizeHashTags(line)
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// sanitizeHashTags removes '#' prefix from flow-sequence entries in a tags line.
+// "tags: [#foo, #bar]" → "tags: [foo, bar]"
+func sanitizeHashTags(line string) string {
+	colon := strings.Index(line, ":")
+	if colon < 0 {
+		return line
+	}
+	key := line[:colon+1]
+	val := strings.TrimSpace(line[colon+1:])
+	if !strings.HasPrefix(val, "[") {
+		return line
+	}
+	// Strip '#' from each item inside the brackets.
+	inner := val[1 : len(val)-1]
+	parts := strings.Split(inner, ",")
+	for j, p := range parts {
+		trimmed := strings.TrimSpace(p)
+		if strings.HasPrefix(trimmed, "#") {
+			parts[j] = strings.Replace(p, "#", "", 1)
+		}
+	}
+	return key + " [" + strings.Join(parts, ",") + "]"
 }

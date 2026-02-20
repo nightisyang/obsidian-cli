@@ -21,6 +21,10 @@ func newVaultInitCmd() *cobra.Command {
 			target := "."
 			if len(args) == 1 {
 				target = args[0]
+			} else if rootOpts.vault != "" {
+				// When --vault is provided without a positional path arg,
+				// write the config into the vault directory itself.
+				target = rootOpts.vault
 			}
 			root, err := filepath.Abs(target)
 			if err != nil {
