@@ -6,6 +6,7 @@ func newNoteCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "note", Short: "Note operations"}
 	cmd.AddCommand(newNoteCreateCmd())
 	cmd.AddCommand(newNoteGetCmd())
+	cmd.AddCommand(newNoteFindCmd())
 	cmd.AddCommand(newNoteListCmd())
 	cmd.AddCommand(newNoteDeleteCmd())
 	cmd.AddCommand(newNoteAppendCmd())

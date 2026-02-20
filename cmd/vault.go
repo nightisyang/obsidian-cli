@@ -8,6 +8,7 @@ func newVaultCmd() *cobra.Command {
 		Short: "Vault management commands",
 	}
 	cmd.AddCommand(newVaultInitCmd())
+	cmd.AddCommand(newVaultMigrateCmd())
 	cmd.AddCommand(newVaultStatusCmd())
 	return cmd
 }
