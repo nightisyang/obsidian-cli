@@ -1,11 +1,14 @@
 package note
 
 import (
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/nightisyang/obsidian-cli/internal/errs"
 )
+
+var blockIDPattern = regexp.MustCompile(`^[a-z0-9-]{3,}$`)
 
 func GetBlock(vaultRoot, path, blockID string) (Block, error) {
 	n, err := Read(vaultRoot, path)
@@ -96,10 +99,14 @@ func blockFromBody(body, path, blockID string) (Block, error) {
 }
 
 func findBlockLine(lines []string, blockID string) (int, blockStyle, error) {
-	needle := "^" + strings.TrimSpace(blockID)
-	if needle == "^" {
+	cleanID := strings.TrimSpace(blockID)
+	if cleanID == "" {
 		return -1, blockStyleInline, errs.New(errs.ExitValidation, "block id is required")
 	}
+	if !blockIDPattern.MatchString(cleanID) {
+		return -1, blockStyleInline, errs.New(errs.ExitValidation, "block id must match ^[a-z0-9-]{3,}$")
+	}
+	needle := "^" + cleanID
 	for i, raw := range lines {
 		line := strings.TrimSpace(strings.TrimRight(raw, "\r"))
 		if line == needle {

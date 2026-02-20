@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/nightisyang/obsidian-cli/internal/backend"
+	"github.com/nightisyang/obsidian-cli/internal/errs"
 	"github.com/nightisyang/obsidian-cli/internal/output"
 	"github.com/nightisyang/obsidian-cli/internal/vault"
 )
@@ -31,6 +32,11 @@ func Build(ctx context.Context, opts Options) (*Runtime, error) {
 	}
 	if requestedMode == "" {
 		requestedMode = "auto"
+	}
+	switch requestedMode {
+	case "auto", "native", "api":
+	default:
+		return nil, errs.New(errs.ExitValidation, "mode must be one of auto, native, api")
 	}
 
 	effectiveMode := requestedMode

@@ -45,13 +45,18 @@ func EnsureExists(vaultRoot, path string) (Note, error) {
 		return Read(vaultRoot, normalized)
 	}
 
-	if mkErr := os.MkdirAll(filepath.Dir(abs), 0o755); mkErr != nil {
-		return Note{}, mkErr
+	created, err := Write(vaultRoot, normalized, Note{
+		Path:  normalized,
+		Title: titleFromPath(normalized),
+		Frontmatter: Frontmatter{
+			Extra: map[string]any{},
+		},
+		Body: "",
+	}, true, time.Now())
+	if err != nil {
+		return Note{}, err
 	}
-	if writeErr := os.WriteFile(abs, nil, 0o644); writeErr != nil {
-		return Note{}, writeErr
-	}
-	return Read(vaultRoot, normalized)
+	return created, nil
 }
 
 func DailyRead(vaultRoot string, at time.Time, create bool) (Note, string, error) {

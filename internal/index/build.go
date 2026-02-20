@@ -54,6 +54,41 @@ func BuildIndex(vaultRoot string) (BacklinkIndex, error) {
 	return idx, nil
 }
 
+func IsStale(vaultRoot string, idx BacklinkIndex) (bool, error) {
+	files, err := ListMarkdownFiles(vaultRoot)
+	if err != nil {
+		return false, err
+	}
+	if len(files) != len(idx.SourceToTarget) {
+		return true, nil
+	}
+
+	maxMtime := time.Time{}
+	for _, abs := range files {
+		info, err := os.Stat(abs)
+		if err != nil {
+			return false, err
+		}
+		if info.ModTime().After(maxMtime) {
+			maxMtime = info.ModTime()
+		}
+
+		rel, err := filepath.Rel(vaultRoot, abs)
+		if err != nil {
+			return false, err
+		}
+		rel = filepath.ToSlash(rel)
+		if _, ok := idx.SourceToTarget[rel]; !ok {
+			return true, nil
+		}
+	}
+
+	if maxMtime.After(idx.FileMTimeMax) {
+		return true, nil
+	}
+	return false, nil
+}
+
 func BacklinksForPath(vaultRoot string, index BacklinkIndex, relPath string) []string {
 	target := NormalizeLinkTarget(strings.TrimSuffix(relPath, ".md"))
 	base := NormalizeLinkTarget(strings.TrimSuffix(filepath.Base(relPath), ".md"))

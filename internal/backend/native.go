@@ -168,6 +168,15 @@ func (b *NativeBackend) Backlinks(_ context.Context, path string, rebuild bool) 
 	var ok bool
 	if !rebuild {
 		idx, ok = index.GetCached(b.vaultRoot)
+		if ok {
+			stale, err := index.IsStale(b.vaultRoot, idx)
+			if err != nil {
+				return nil, err
+			}
+			if stale {
+				ok = false
+			}
+		}
 	}
 	if !ok || rebuild {
 		built, err := index.BuildIndex(b.vaultRoot)

@@ -71,3 +71,38 @@ func TestListPluginsAndOpenURI(t *testing.T) {
 		t.Fatalf("expected non-empty URI")
 	}
 }
+
+func TestBacklinksRebuildsWhenCacheIsStale(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "a.md"), []byte("[[b]]"), 0o644); err != nil {
+		t.Fatalf("write a: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "b.md"), []byte("target"), 0o644); err != nil {
+		t.Fatalf("write b: %v", err)
+	}
+
+	b := NewNativeBackend(root, vault.DefaultConfig(), "native")
+	before, err := b.Backlinks(context.Background(), "b.md", false)
+	if err != nil {
+		t.Fatalf("Backlinks initial error: %v", err)
+	}
+	if len(before) != 1 || before[0] != "a.md" {
+		t.Fatalf("unexpected initial backlinks: %+v", before)
+	}
+
+	if err := os.WriteFile(filepath.Join(root, "a.md"), []byte("no links"), 0o644); err != nil {
+		t.Fatalf("rewrite a: %v", err)
+	}
+	future := time.Now().Add(2 * time.Second)
+	if err := os.Chtimes(filepath.Join(root, "a.md"), future, future); err != nil {
+		t.Fatalf("chtimes a: %v", err)
+	}
+
+	after, err := b.Backlinks(context.Background(), "b.md", false)
+	if err != nil {
+		t.Fatalf("Backlinks stale-rebuild error: %v", err)
+	}
+	if len(after) != 0 {
+		t.Fatalf("expected stale cache rebuild to remove backlinks, got %+v", after)
+	}
+}

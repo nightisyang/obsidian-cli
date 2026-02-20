@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nightisyang/obsidian-cli/internal/errs"
 	"github.com/nightisyang/obsidian-cli/internal/vault"
 )
 
@@ -45,5 +46,26 @@ func TestListAndReadTemplate(t *testing.T) {
 	expected := "Date: 2026-02-20\nTime: 03:04\nTitle: Trip"
 	if resolved.Content != expected {
 		t.Fatalf("unexpected resolved content: %q", resolved.Content)
+	}
+}
+
+func TestReadTemplateRejectsTraversal(t *testing.T) {
+	root := t.TempDir()
+	templateDir := filepath.Join(root, ".obsidian", "templates")
+	if err := os.MkdirAll(templateDir, 0o755); err != nil {
+		t.Fatalf("mkdir templates: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "secret.md"), []byte("secret"), 0o644); err != nil {
+		t.Fatalf("write secret: %v", err)
+	}
+
+	cfg := vault.DefaultConfig()
+	_, err := Read(root, cfg, "../secret", "", false, time.Now())
+	if err == nil {
+		t.Fatalf("expected traversal validation error")
+	}
+	appErr, ok := err.(*errs.AppError)
+	if !ok || appErr.Code != errs.ExitValidation {
+		t.Fatalf("expected validation app error, got %T (%v)", err, err)
 	}
 }

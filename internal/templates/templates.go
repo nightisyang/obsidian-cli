@@ -112,10 +112,14 @@ func resolveTemplatePath(vaultRoot string, cfg vault.Config, name string) (strin
 
 	for _, candidate := range candidates {
 		base := strings.TrimPrefix(strings.ReplaceAll(candidate, "\\", "/"), "/")
+		base = filepath.FromSlash(base)
 		if !strings.HasSuffix(strings.ToLower(base), ".md") {
 			base += ".md"
 		}
 		abs := filepath.Clean(filepath.Join(dir, base))
+		if !isPathWithinRoot(dir, abs) {
+			return "", "", errs.New(errs.ExitValidation, "template path escapes templates directory")
+		}
 		if _, err := os.Stat(abs); err == nil {
 			rel, _ := filepath.Rel(vaultRoot, abs)
 			return abs, filepath.ToSlash(rel), nil
@@ -134,4 +138,13 @@ func resolveTemplatePath(vaultRoot string, cfg vault.Config, name string) (strin
 		}
 	}
 	return "", "", errs.New(errs.ExitNotFound, "template not found")
+}
+
+func isPathWithinRoot(root, candidate string) bool {
+	cleanRoot := filepath.Clean(root)
+	cleanCandidate := filepath.Clean(candidate)
+	if cleanCandidate == cleanRoot {
+		return true
+	}
+	return strings.HasPrefix(cleanCandidate, cleanRoot+string(filepath.Separator))
 }

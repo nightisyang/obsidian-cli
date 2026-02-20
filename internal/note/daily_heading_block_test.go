@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/nightisyang/obsidian-cli/internal/errs"
 )
 
 func TestDailyPathAndReadCreate(t *testing.T) {
@@ -32,6 +34,9 @@ func TestDailyPathAndReadCreate(t *testing.T) {
 	}
 	if resolved != path || n.Path != path {
 		t.Fatalf("unexpected daily read result: %s %+v", resolved, n)
+	}
+	if n.Frontmatter.CreatedAt == nil || n.Frontmatter.UpdatedAt == nil {
+		t.Fatalf("expected timestamps on created daily note")
 	}
 }
 
@@ -80,5 +85,14 @@ func TestGetAndSetBlock(t *testing.T) {
 	}
 	if updated.Content != "new text" {
 		t.Fatalf("unexpected updated block: %+v", updated)
+	}
+
+	if _, err := GetBlock(root, "block.md", "AB"); err == nil {
+		t.Fatalf("expected invalid block id error")
+	} else {
+		appErr, ok := err.(*errs.AppError)
+		if !ok || appErr.Code != errs.ExitValidation {
+			t.Fatalf("expected validation app error, got %T (%v)", err, err)
+		}
 	}
 }

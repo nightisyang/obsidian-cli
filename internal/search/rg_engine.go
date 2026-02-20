@@ -15,16 +15,16 @@ type RGEngine struct {
 }
 
 func (e *RGEngine) Search(ctx context.Context, q Query) ([]SearchResult, error) {
-	if _, err := exec.LookPath("rg"); err != nil {
-		return nil, errs.New(errs.ExitGeneric, "ripgrep (rg) is required for text search")
-	}
 	if q.Type != QueryText {
 		return nil, errs.New(errs.ExitValidation, "ripgrep engine supports text queries only")
 	}
 
-	searchRoot := e.VaultRoot
-	if strings.TrimSpace(q.Path) != "" {
-		searchRoot = filepath.Join(e.VaultRoot, q.Path)
+	searchRoot, err := e.resolveSearchRoot(q.Path)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := exec.LookPath("rg"); err != nil {
+		return nil, errs.New(errs.ExitGeneric, "ripgrep (rg) is required for text search; install ripgrep and ensure `rg` is on PATH")
 	}
 
 	args := []string{"--json", "--line-number", "--glob", "*.md"}
@@ -38,7 +38,7 @@ func (e *RGEngine) Search(ctx context.Context, q Query) ([]SearchResult, error) 
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 
-	err := cmd.Run()
+	err = cmd.Run()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			if exitErr.ExitCode() == 1 {
@@ -66,4 +66,17 @@ type errWithMessage string
 
 func (e errWithMessage) Error() string {
 	return string(e)
+}
+
+func (e *RGEngine) resolveSearchRoot(pathPrefix string) (string, error) {
+	root := filepath.Clean(e.VaultRoot)
+	if strings.TrimSpace(pathPrefix) == "" {
+		return root, nil
+	}
+
+	candidate := filepath.Clean(filepath.Join(root, filepath.FromSlash(pathPrefix)))
+	if candidate == root || strings.HasPrefix(candidate, root+string(filepath.Separator)) {
+		return candidate, nil
+	}
+	return "", errs.New(errs.ExitValidation, "search path escapes vault root")
 }

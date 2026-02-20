@@ -12,24 +12,25 @@ func ParseDocument(raw string) (map[string]any, string, bool, error) {
 		return map[string]any{}, normalized, false, nil
 	}
 
-	rest := normalized[len("---\n"):]
-	idx := strings.Index(rest, "\n---\n")
-	if idx < 0 {
-		if strings.HasSuffix(rest, "\n---") {
-			idx = len(rest) - len("\n---")
-		} else {
-			return map[string]any{}, normalized, false, nil
+	lines := strings.Split(normalized, "\n")
+	closing := -1
+	for i := 1; i < len(lines); i++ {
+		if lines[i] == "---" {
+			closing = i
+			break
 		}
 	}
+	if closing < 0 {
+		return map[string]any{}, normalized, false, nil
+	}
 
-	yamlPart := rest[:idx]
+	yamlPart := strings.Join(lines[1:closing], "\n")
 	body := ""
-	endOffset := idx + len("\n---\n")
-	if endOffset <= len(rest) {
-		body = rest[endOffset:]
-		if strings.HasPrefix(body, "\n") {
-			body = body[1:]
-		}
+	if closing+1 < len(lines) {
+		body = strings.Join(lines[closing+1:], "\n")
+	}
+	if strings.HasPrefix(body, "\n") {
+		body = body[1:]
 	}
 
 	result := map[string]any{}
