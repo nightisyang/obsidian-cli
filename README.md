@@ -10,6 +10,12 @@ Standalone CLI for Obsidian vaults, designed for headless usage without the Obsi
 - Tags from frontmatter and inline `#tag`
 - Search with ripgrep (`rg`) backend for text + native tag/property search
 - Wikilink parsing and backlink index
+- Daily notes (`daily`, `daily path/read/append/prepend`)
+- Templates (`templates`, `template read/insert`, `note create --template`)
+- Tasks and task updates (`tasks`, `task`)
+- Heading and block addressing (`note get --heading`, `block get/set`)
+- Obsidian URI open (`open <path>`)
+- Native plugin/sync introspection (`plugins`, `commands`, `sync status`)
 - JSON output mode for every command
 
 ## Requirements
@@ -52,6 +58,26 @@ go build -o obsidian-cli .
 ./obsidian-cli --vault /path/to/vault search "meeting notes"
 ./obsidian-cli --vault /path/to/vault search --tag project
 ./obsidian-cli --vault /path/to/vault search --prop status=active
+
+# Daily notes
+./obsidian-cli --vault /path/to/vault daily
+./obsidian-cli --vault /path/to/vault daily append "- [ ] Follow up"
+
+# Templates
+./obsidian-cli --vault /path/to/vault templates
+./obsidian-cli --vault /path/to/vault template read Daily --resolve --title "Today"
+./obsidian-cli --vault /path/to/vault template insert project-plan.md Daily
+
+# Tasks
+./obsidian-cli --vault /path/to/vault tasks --todo
+./obsidian-cli --vault /path/to/vault task --ref "project-plan.md:12" --toggle
+
+# Heading/block targeting
+./obsidian-cli --vault /path/to/vault note get project-plan.md --heading "Next Steps"
+./obsidian-cli --vault /path/to/vault block get project-plan.md abc123
+
+# Open in Obsidian app
+./obsidian-cli --vault /path/to/vault open project-plan.md --launch
 
 # Links and backlinks
 ./obsidian-cli --vault /path/to/vault links list project-plan.md

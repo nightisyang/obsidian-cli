@@ -11,5 +11,6 @@ func newNoteCmd() *cobra.Command {
 	cmd.AddCommand(newNoteAppendCmd())
 	cmd.AddCommand(newNotePrependCmd())
 	cmd.AddCommand(newNoteMoveCmd())
+	cmd.AddCommand(newNoteDailyCmd())
 	return cmd
 }

@@ -18,10 +18,28 @@ type CreateInput struct {
 	Title    string
 	Dir      string
 	Template string
+	Content  string
 	Tags     []string
 	Kind     string
 	Topic    string
 	Status   string
+}
+
+type HeadingSection struct {
+	Path      string `json:"path"`
+	Heading   string `json:"heading"`
+	Level     int    `json:"level"`
+	Content   string `json:"content"`
+	StartLine int    `json:"start_line"`
+	EndLine   int    `json:"end_line"`
+}
+
+type Block struct {
+	Path       string `json:"path"`
+	BlockID    string `json:"block_id"`
+	Content    string `json:"content"`
+	Line       int    `json:"line"`
+	AnchorLine int    `json:"anchor_line"`
 }
 
 type ListOptions struct {

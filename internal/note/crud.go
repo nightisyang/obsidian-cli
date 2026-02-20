@@ -41,7 +41,7 @@ func Create(vaultRoot string, in CreateInput) (Note, error) {
 			Status: in.Status,
 			Extra:  map[string]any{},
 		},
-		Body: "",
+		Body: in.Content,
 	}
 	return Write(vaultRoot, normalized, n, true, time.Now())
 }
@@ -141,12 +141,16 @@ func Delete(vaultRoot, path string) error {
 }
 
 func Append(vaultRoot, path, content string) (Note, error) {
+	return AppendWithOptions(vaultRoot, path, content, false)
+}
+
+func AppendWithOptions(vaultRoot, path, content string, inline bool) (Note, error) {
 	n, err := Read(vaultRoot, path)
 	if err != nil {
 		return Note{}, err
 	}
 	text := content
-	if n.Body != "" && !strings.HasSuffix(n.Body, "\n") {
+	if !inline && n.Body != "" && !strings.HasSuffix(n.Body, "\n") {
 		n.Body += "\n"
 	}
 	n.Body += text
@@ -154,12 +158,16 @@ func Append(vaultRoot, path, content string) (Note, error) {
 }
 
 func Prepend(vaultRoot, path, content string) (Note, error) {
+	return PrependWithOptions(vaultRoot, path, content, false)
+}
+
+func PrependWithOptions(vaultRoot, path, content string, inline bool) (Note, error) {
 	n, err := Read(vaultRoot, path)
 	if err != nil {
 		return Note{}, err
 	}
 	text := content
-	if text != "" && !strings.HasSuffix(text, "\n") {
+	if !inline && text != "" && !strings.HasSuffix(text, "\n") {
 		text += "\n"
 	}
 	n.Body = text + n.Body

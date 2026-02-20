@@ -5,6 +5,7 @@ import (
 )
 
 func newNoteGetCmd() *cobra.Command {
+	var heading string
 	cmd := &cobra.Command{
 		Use:   "get <path>",
 		Short: "Get a note",
@@ -13,6 +14,17 @@ func newNoteGetCmd() *cobra.Command {
 			rt, err := getRuntime(cmd)
 			if err != nil {
 				return err
+			}
+			if heading != "" {
+				section, err := rt.Backend.GetHeading(rt.Context, args[0], heading)
+				if err != nil {
+					return err
+				}
+				if rt.Printer.JSON {
+					return rt.Printer.PrintJSON(section)
+				}
+				rt.Printer.Println(section.Content)
+				return nil
 			}
 			n, err := rt.Backend.GetNote(rt.Context, args[0])
 			if err != nil {
@@ -25,5 +37,6 @@ func newNoteGetCmd() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&heading, "heading", "", "Read only a specific heading section")
 	return cmd
 }

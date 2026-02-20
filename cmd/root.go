@@ -88,6 +88,17 @@ func newRootCmd() *cobra.Command {
 	root.AddCommand(newTagCmd())
 	root.AddCommand(newSearchCmd())
 	root.AddCommand(newLinksCmd())
+	root.AddCommand(newDailyCmd())
+	root.AddCommand(newTemplatesCmd())
+	root.AddCommand(newTemplateCmd())
+	root.AddCommand(newOpenCmd())
+	root.AddCommand(newSyncCmd())
+	root.AddCommand(newTasksCmd())
+	root.AddCommand(newTaskCmd())
+	root.AddCommand(newBlockCmd())
+	root.AddCommand(newPluginsCmd())
+	root.AddCommand(newCommandsCmd())
+	root.AddCommand(newCommandCmd())
 
 	return root
 }
