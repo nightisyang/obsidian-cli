@@ -16,11 +16,13 @@ import (
 type runtimeKey struct{}
 
 var rootOpts struct {
-	vault  string
-	config string
-	mode   string
-	json   bool
-	quiet  bool
+	vault            string
+	config           string
+	mode             string
+	json             bool
+	quiet            bool
+	noteSizeMaxBytes int
+	noOrphanNotes    bool
 }
 
 func Execute() int {
@@ -88,6 +90,8 @@ func newRootCmd() *cobra.Command {
 	root.PersistentFlags().StringVar(&rootOpts.mode, "mode", "", "Mode: native|api|auto")
 	root.PersistentFlags().BoolVar(&rootOpts.json, "json", false, "JSON output")
 	root.PersistentFlags().BoolVar(&rootOpts.quiet, "quiet", false, "Quiet human output")
+	root.PersistentFlags().IntVar(&rootOpts.noteSizeMaxBytes, "note-size-max-bytes", 131072, "Maximum allowed note size after writes in bytes (0 disables)")
+	root.PersistentFlags().BoolVar(&rootOpts.noOrphanNotes, "no-orphan-notes", false, "Fail writes when a note has no graph connections to other notes")
 
 	root.AddCommand(newVaultCmd())
 	root.AddCommand(newNoteCmd())

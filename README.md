@@ -19,7 +19,7 @@ Standalone CLI for Obsidian vaults, designed for headless usage without the Obsi
 - Obsidian URI open (`open <path>`)
 - Vault-aware file/folder listing (`list [path]`)
 - Agent contracts and schema export (`help --agent`, `schema`)
-- Batch operations with rollback (`ops apply`)
+- Batch operations (`ops apply`)
 - Native plugin/sync introspection (`plugins`, `commands`, `sync status`)
 - JSON output mode for every command
 
@@ -106,7 +106,7 @@ go build -o obsidian-cli .
 ./obsidian-cli help --agent --format json
 ./obsidian-cli schema --format json
 
-# Batch apply with rollback
+# Batch apply
 cat > ops.json <<'JSON'
 {
   "ops": [
@@ -115,7 +115,7 @@ cat > ops.json <<'JSON'
   ]
 }
 JSON
-./obsidian-cli --vault /path/to/vault --json ops apply ops.json --rollback
+./obsidian-cli --vault /path/to/vault --json ops apply ops.json
 ```
 
 ## Agent Workflow
@@ -129,13 +129,75 @@ Use these as agent primitives:
 - `search-content <query>`: explicit content search entry point.
 - `search` / `search-content --with-meta`: include retrieval metadata + warnings.
 - `graph context` / `graph neighborhood`: relationship context packs with metadata + warnings.
-- `ops apply <spec.json> [--rollback]`: batch execute command arrays from JSON.
+- `ops apply <spec.json>`: batch execute command arrays from JSON.
 
 Mutation safety flags:
 
 - `--dry-run`: preview write behavior (supported on mutating commands).
 - `--if-hash <sha256>`: optimistic concurrency guard for note writes.
 - `--strict`: fail when warnings are present (agent guardrail mode).
+- `--note-size-max-bytes <N>`: hard maximum size for a single note after writes (`0` disables).
+- `--no-orphan-notes`: fail writes when a note has no graph connections to other notes.
+
+## Note Size Guardrails (Agent-First)
+
+The CLI can enforce deterministic per-note size limits on write commands (`note create/append/prepend`, `daily append/prepend`, `template insert`, `block set`).
+
+- Exceeding the limit always fails the write with validation error `note_size_limit_exceeded`.
+
+Examples:
+
+```bash
+# Fail when any written note exceeds 120 KB
+./obsidian-cli --vault /path/to/vault --note-size-max-bytes 122880 note append project-plan.md "..."
+```
+
+When this failure occurs, split content into a new note and add reciprocal backlinks.
+
+Example correction flow:
+
+```bash
+./obsidian-cli --vault /path/to/vault note create "Project Plan Part 2" --content "<moved section>"
+./obsidian-cli --vault /path/to/vault note append project-plan.md "Continued in [[project-plan-part-2]]"
+./obsidian-cli --vault /path/to/vault note append project-plan-part-2.md "Context from [[project-plan]]"
+```
+
+## Backlink Target Validation (Agent-First)
+
+Write commands also validate wikilink targets so backlink graph edges remain valid.
+If a note contains `[[target]]` and `target.md` does not exist (or cannot be resolved by stem/path), the write fails with `backlink_target_not_found`.
+
+Example:
+
+```bash
+# Fails: missing target note
+./obsidian-cli --vault /path/to/vault note create "Source" --content "See [[missing-target]]"
+
+# Fix by creating target, then writing the link
+./obsidian-cli --vault /path/to/vault note create "Missing Target"
+./obsidian-cli --vault /path/to/vault note create "Source" --content "See [[missing-target]]"
+```
+
+## No Orphan Notes (Agent-First)
+
+With `--no-orphan-notes`, mutating writes fail if the resulting note has no graph connections to other notes:
+- no outgoing link to another note, and
+- no inbound backlink from another note.
+
+Failure reason: `orphan_note_not_allowed`
+
+Agent correction flow:
+
+```bash
+# 1) discover a hub note
+./obsidian-cli --vault /path/to/vault note list --limit 1
+
+# 2) connect current note to the hub
+./obsidian-cli --vault /path/to/vault note append current.md "Related: [[existing-note]]"
+
+# 3) add reciprocal backlink
+./obsidian-cli --vault /path/to/vault note append existing-note.md "Related: [[current]]"
+```
 
 ## Global Flags
 
@@ -144,7 +206,8 @@ Mutation safety flags:
 - `--mode <native|api|auto>`: mode selector (POC uses native backend)
 - `--json`: machine-readable output envelope
 - `--quiet`: reduce human output labels
-- `--timeout <duration>`: command timeout value
+- `--note-size-max-bytes <N>`: maximum size for a single note after writes (`default: 131072`, `0` disables)
+- `--no-orphan-notes`: block writes that leave notes disconnected from the link graph
 
 ## Exit Codes
 

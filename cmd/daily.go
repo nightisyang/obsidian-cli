@@ -153,6 +153,9 @@ func newDailyAppendCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if err := enforceWriteGuards(rt, n); err != nil {
+				return err
+			}
 			if rt.Printer.JSON {
 				return rt.Printer.PrintJSON(n)
 			}
@@ -207,6 +210,9 @@ func newDailyPrependCmd() *cobra.Command {
 			}
 			n, err := rt.Backend.DailyPrepend(rt.Context, at, args[0], inline)
 			if err != nil {
+				return err
+			}
+			if err := enforceWriteGuards(rt, n); err != nil {
 				return err
 			}
 			if rt.Printer.JSON {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -92,5 +93,131 @@ func TestGraphStrictFailsWhenTruncated(t *testing.T) {
 	)
 	if err == nil {
 		t.Fatalf("expected strict mode failure for truncated graph")
+	}
+}
+
+func TestNoteSizeLimitFailsOnCreate(t *testing.T) {
+	root := t.TempDir()
+
+	_, _, err := runCLI(
+		t,
+		"--vault", root,
+		"--note-size-max-bytes", "1",
+		"note", "create", "Large",
+		"--content", "hello world",
+	)
+	if err == nil {
+		t.Fatalf("expected note size limit failure on create")
+	}
+	if !strings.Contains(err.Error(), "exceeding 1 bytes") {
+		t.Fatalf("unexpected note size limit error: %v", err)
+	}
+}
+
+func TestNoteSizeLimitFailsOnAppend(t *testing.T) {
+	root := t.TempDir()
+
+	_, stderr, err := runCLI(
+		t,
+		"--vault", root,
+		"note", "create", "Large",
+		"--content", "seed",
+	)
+	if err != nil {
+		t.Fatalf("note create seed failed: %v (stderr=%q)", err, stderr)
+	}
+
+	_, _, err = runCLI(
+		t,
+		"--vault", root,
+		"--note-size-max-bytes", "1",
+		"note", "append", "large.md", "more",
+	)
+	if err == nil {
+		t.Fatalf("expected note size limit failure on append")
+	}
+	if !strings.Contains(err.Error(), "exceeding 1 bytes") {
+		t.Fatalf("unexpected note size limit error: %v", err)
+	}
+}
+
+func TestBacklinkValidationFailsOnCreateWithMissingTarget(t *testing.T) {
+	root := t.TempDir()
+
+	_, _, err := runCLI(
+		t,
+		"--vault", root,
+		"note", "create", "Source",
+		"--content", "See [[missing-target]]",
+	)
+	if err == nil {
+		t.Fatalf("expected backlink target validation failure")
+	}
+	if !strings.Contains(err.Error(), "unresolved wikilinks: missing-target") {
+		t.Fatalf("unexpected backlink validation error: %v", err)
+	}
+}
+
+func TestBacklinkValidationPassesWhenTargetExists(t *testing.T) {
+	root := t.TempDir()
+
+	_, stderr, err := runCLI(
+		t,
+		"--vault", root,
+		"note", "create", "Target",
+	)
+	if err != nil {
+		t.Fatalf("create target failed: %v (stderr=%q)", err, stderr)
+	}
+
+	_, stderr, err = runCLI(
+		t,
+		"--vault", root,
+		"note", "create", "Source",
+		"--content", "See [[target]]",
+	)
+	if err != nil {
+		t.Fatalf("create source with valid link failed: %v (stderr=%q)", err, stderr)
+	}
+}
+
+func TestNoOrphanNotesFailsForIsolatedNote(t *testing.T) {
+	root := t.TempDir()
+
+	_, _, err := runCLI(
+		t,
+		"--vault", root,
+		"--no-orphan-notes",
+		"note", "create", "Isolated",
+	)
+	if err == nil {
+		t.Fatalf("expected no-orphan-notes validation failure")
+	}
+	if !strings.Contains(err.Error(), "no graph connections") {
+		t.Fatalf("unexpected no-orphan-notes error: %v", err)
+	}
+}
+
+func TestNoOrphanNotesPassesWithOutgoingLink(t *testing.T) {
+	root := t.TempDir()
+
+	_, stderr, err := runCLI(
+		t,
+		"--vault", root,
+		"note", "create", "Hub",
+	)
+	if err != nil {
+		t.Fatalf("create hub failed: %v (stderr=%q)", err, stderr)
+	}
+
+	_, stderr, err = runCLI(
+		t,
+		"--vault", root,
+		"--no-orphan-notes",
+		"note", "create", "Node",
+		"--content", "Related: [[hub]]",
+	)
+	if err != nil {
+		t.Fatalf("create node with outgoing link failed: %v (stderr=%q)", err, stderr)
 	}
 }

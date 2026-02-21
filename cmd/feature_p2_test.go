@@ -63,6 +63,8 @@ func resetRootOptsForTest() {
 	rootOpts.mode = ""
 	rootOpts.json = false
 	rootOpts.quiet = false
+	rootOpts.noteSizeMaxBytes = 131072
+	rootOpts.noOrphanNotes = false
 }
 
 func parseEnvelope(t *testing.T, raw string) testEnvelope {

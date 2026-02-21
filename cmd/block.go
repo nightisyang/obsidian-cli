@@ -73,6 +73,13 @@ func newBlockSetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			n, err := rt.Backend.GetNote(rt.Context, block.Path)
+			if err != nil {
+				return err
+			}
+			if err := enforceWriteGuards(rt, n); err != nil {
+				return err
+			}
 			if rt.Printer.JSON {
 				return rt.Printer.PrintJSON(block)
 			}

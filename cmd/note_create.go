@@ -73,6 +73,9 @@ func newNoteCreateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if err := enforceWriteGuards(rt, created); err != nil {
+				return err
+			}
 			if openOnly {
 				if rt.Printer.JSON {
 					return rt.Printer.PrintJSON(map[string]any{"path": created.Path})
