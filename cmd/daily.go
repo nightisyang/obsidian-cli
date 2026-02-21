@@ -4,6 +4,7 @@ import "github.com/spf13/cobra"
 
 func newDailyCmd() *cobra.Command {
 	var date string
+	var dryRun bool
 	cmd := &cobra.Command{
 		Use:   "daily",
 		Short: "Open or create today's daily note",
@@ -15,6 +16,22 @@ func newDailyCmd() *cobra.Command {
 			at, err := parseDateFlag(date)
 			if err != nil {
 				return err
+			}
+			if dryRun {
+				path, err := rt.Backend.DailyPath(rt.Context, at)
+				if err != nil {
+					return err
+				}
+				if rt.Printer.JSON {
+					return rt.Printer.PrintJSON(map[string]any{
+						"dry_run": true,
+						"action":  "daily.read-or-create",
+						"path":    path,
+						"date":    at.Format("2006-01-02"),
+					})
+				}
+				rt.Printer.Println("dry-run: would read/create " + path)
+				return nil
 			}
 			n, err := rt.Backend.DailyRead(rt.Context, at, true)
 			if err != nil {
@@ -28,6 +45,7 @@ func newDailyCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&date, "date", "", "Date (YYYY-MM-DD), default today")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview operation without writing files")
 	cmd.AddCommand(newDailyPathCmd())
 	cmd.AddCommand(newDailyReadCmd())
 	cmd.AddCommand(newDailyAppendCmd())
@@ -96,6 +114,8 @@ func newDailyReadCmd() *cobra.Command {
 func newDailyAppendCmd() *cobra.Command {
 	var date string
 	var inline bool
+	var dryRun bool
+	var ifHash string
 	cmd := &cobra.Command{
 		Use:   "append <content>",
 		Short: "Append content to daily note",
@@ -108,6 +128,26 @@ func newDailyAppendCmd() *cobra.Command {
 			at, err := parseDateFlag(date)
 			if err != nil {
 				return err
+			}
+			path, err := rt.Backend.DailyPath(rt.Context, at)
+			if err != nil {
+				return err
+			}
+			if err := verifyHashPrecondition(rt, path, ifHash); err != nil {
+				return err
+			}
+			if dryRun {
+				if rt.Printer.JSON {
+					return rt.Printer.PrintJSON(map[string]any{
+						"dry_run": true,
+						"action":  "daily.append",
+						"path":    path,
+						"content": args[0],
+						"inline":  inline,
+					})
+				}
+				rt.Printer.Println("dry-run: would append to " + path)
+				return nil
 			}
 			n, err := rt.Backend.DailyAppend(rt.Context, at, args[0], inline)
 			if err != nil {
@@ -122,12 +162,16 @@ func newDailyAppendCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&date, "date", "", "Date (YYYY-MM-DD), default today")
 	cmd.Flags().BoolVar(&inline, "inline", false, "Append without newline")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview operation without writing files")
+	cmd.Flags().StringVar(&ifHash, "if-hash", "", "Require current note SHA256 hash before writing")
 	return cmd
 }
 
 func newDailyPrependCmd() *cobra.Command {
 	var date string
 	var inline bool
+	var dryRun bool
+	var ifHash string
 	cmd := &cobra.Command{
 		Use:   "prepend <content>",
 		Short: "Prepend content to daily note",
@@ -140,6 +184,26 @@ func newDailyPrependCmd() *cobra.Command {
 			at, err := parseDateFlag(date)
 			if err != nil {
 				return err
+			}
+			path, err := rt.Backend.DailyPath(rt.Context, at)
+			if err != nil {
+				return err
+			}
+			if err := verifyHashPrecondition(rt, path, ifHash); err != nil {
+				return err
+			}
+			if dryRun {
+				if rt.Printer.JSON {
+					return rt.Printer.PrintJSON(map[string]any{
+						"dry_run": true,
+						"action":  "daily.prepend",
+						"path":    path,
+						"content": args[0],
+						"inline":  inline,
+					})
+				}
+				rt.Printer.Println("dry-run: would prepend to " + path)
+				return nil
 			}
 			n, err := rt.Backend.DailyPrepend(rt.Context, at, args[0], inline)
 			if err != nil {
@@ -154,5 +218,7 @@ func newDailyPrependCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&date, "date", "", "Date (YYYY-MM-DD), default today")
 	cmd.Flags().BoolVar(&inline, "inline", false, "Prepend without newline")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview operation without writing files")
+	cmd.Flags().StringVar(&ifHash, "if-hash", "", "Require current note SHA256 hash before writing")
 	return cmd
 }

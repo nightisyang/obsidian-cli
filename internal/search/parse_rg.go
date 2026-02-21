@@ -27,8 +27,15 @@ type rgEvent struct {
 }
 
 func ParseRGOutput(reader io.Reader, contextChars int, limit int) ([]SearchResult, error) {
+	results, _, err := ParseRGOutputStream(reader, contextChars, limit)
+	return results, err
+}
+
+func ParseRGOutputStream(reader io.Reader, contextChars int, limit int) ([]SearchResult, bool, error) {
 	scanner := bufio.NewScanner(reader)
+	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
 	results := []SearchResult{}
+	limitReached := false
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		event := rgEvent{}
@@ -52,13 +59,14 @@ func ParseRGOutput(reader io.Reader, contextChars int, limit int) ([]SearchResul
 			MatchType: "text",
 		})
 		if limit > 0 && len(results) >= limit {
+			limitReached = true
 			break
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		return nil, limitReached, err
 	}
-	return results, nil
+	return results, limitReached, nil
 }
 
 func trimContext(line string, start, end, contextChars int) string {

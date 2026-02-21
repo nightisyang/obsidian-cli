@@ -96,6 +96,7 @@ func newTaskCmd() *cobra.Command {
 	var toggle bool
 	var done bool
 	var todo bool
+	var dryRun bool
 
 	cmd := &cobra.Command{
 		Use:   "task",
@@ -119,6 +120,21 @@ func newTaskCmd() *cobra.Command {
 			}
 			updating := toggle || done || todo || strings.TrimSpace(status) != ""
 			if updating {
+				if dryRun {
+					if rt.Printer.JSON {
+						return rt.Printer.PrintJSON(map[string]any{
+							"dry_run": true,
+							"action":  "task.update",
+							"ref":     fmt.Sprintf("%s:%d", ref.Path, ref.Line),
+							"status":  status,
+							"toggle":  toggle,
+							"done":    done,
+							"todo":    todo,
+						})
+					}
+					rt.Printer.Println(fmt.Sprintf("dry-run: would update task %s:%d", ref.Path, ref.Line))
+					return nil
+				}
 				task, err := rt.Backend.UpdateTask(rt.Context, ref, tasks.UpdateInput{
 					Status: status,
 					Toggle: toggle,
@@ -156,6 +172,7 @@ func newTaskCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&toggle, "toggle", false, "Toggle done/todo")
 	cmd.Flags().BoolVar(&done, "done", false, "Mark done ([x])")
 	cmd.Flags().BoolVar(&todo, "todo", false, "Mark todo ([ ])")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview operation without writing files")
 	return cmd
 }
 

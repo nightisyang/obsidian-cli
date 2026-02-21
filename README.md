@@ -9,12 +9,17 @@ Standalone CLI for Obsidian vaults, designed for headless usage without the Obsi
 - Frontmatter properties with unknown-field preservation
 - Tags from frontmatter and inline `#tag`
 - Search with ripgrep (`rg`) backend for text + native tag/property search
+- Search-content alias (`search-content <query>`)
+- Graph retrieval helpers (`graph context`, `graph neighborhood`)
 - Wikilink parsing and backlink index
 - Daily notes (`daily`, `daily path/read/append/prepend`)
 - Templates (`templates`, `template read/insert`, `note create --template`)
 - Tasks and task updates (`tasks`, `task`)
 - Heading and block addressing (`note get --heading`, `block get/set`)
 - Obsidian URI open (`open <path>`)
+- Vault-aware file/folder listing (`list [path]`)
+- Agent contracts and schema export (`help --agent`, `schema`)
+- Batch operations with rollback (`ops apply`)
 - Native plugin/sync introspection (`plugins`, `commands`, `sync status`)
 - JSON output mode for every command
 
@@ -47,6 +52,7 @@ go build -o obsidian-cli .
 
 # Properties
 ./obsidian-cli --vault /path/to/vault prop set project-plan.md status active
+./obsidian-cli --vault /path/to/vault prop delete project-plan.md status
 ./obsidian-cli --vault /path/to/vault prop get project-plan.md status
 ./obsidian-cli --vault /path/to/vault prop list project-plan.md
 
@@ -56,8 +62,17 @@ go build -o obsidian-cli .
 
 # Search
 ./obsidian-cli --vault /path/to/vault search "meeting notes"
+./obsidian-cli --vault /path/to/vault search-content "meeting notes"
 ./obsidian-cli --vault /path/to/vault search --tag project
 ./obsidian-cli --vault /path/to/vault search --prop status=active
+
+# Graph context for agent retrieval
+./obsidian-cli --vault /path/to/vault --json graph context "meeting notes" --seed-limit 8 --depth 1
+./obsidian-cli --vault /path/to/vault --json graph neighborhood project-plan.md --depth 2
+
+# Vault file/folder discovery
+./obsidian-cli --vault /path/to/vault list
+./obsidian-cli --vault /path/to/vault list "Projects"
 
 # Daily notes
 ./obsidian-cli --vault /path/to/vault daily
@@ -86,7 +101,41 @@ go build -o obsidian-cli .
 # Move note with link rewrites
 ./obsidian-cli --vault /path/to/vault note move project-plan.md archive/project-plan.md --dry-run
 ./obsidian-cli --vault /path/to/vault note move project-plan.md archive/project-plan.md
+
+# Agent context + schema
+./obsidian-cli help --agent --format json
+./obsidian-cli schema --format json
+
+# Batch apply with rollback
+cat > ops.json <<'JSON'
+{
+  "ops": [
+    {"id": "1", "args": ["note", "append", "project-plan.md", "- [ ] Follow up"]},
+    {"id": "2", "args": ["prop", "set", "project-plan.md", "status", "active"], "expect": {"ok": "true"}}
+  ]
+}
+JSON
+./obsidian-cli --vault /path/to/vault --json ops apply ops.json --rollback
 ```
+
+## Agent Workflow
+
+Use these as agent primitives:
+
+- `help --agent [--format json] [--skill <name>]`: skill-injection command contracts.
+- `schema [command...] --format json`: machine-readable command/flag schema.
+- `print-default --path-only`: resolved vault root path.
+- `list [path]`: deterministic folder/file discovery inside vault.
+- `search-content <query>`: explicit content search entry point.
+- `search` / `search-content --with-meta`: include retrieval metadata + warnings.
+- `graph context` / `graph neighborhood`: relationship context packs with metadata + warnings.
+- `ops apply <spec.json> [--rollback]`: batch execute command arrays from JSON.
+
+Mutation safety flags:
+
+- `--dry-run`: preview write behavior (supported on mutating commands).
+- `--if-hash <sha256>`: optimistic concurrency guard for note writes.
+- `--strict`: fail when warnings are present (agent guardrail mode).
 
 ## Global Flags
 
@@ -104,6 +153,13 @@ go build -o obsidian-cli .
 - `3` not found
 - `4` config error
 - `1` generic error
+
+When `--json` is set, failures include:
+
+- `error.code`
+- `error.reason`
+- `error.message`
+- `error.actionable_hint`
 
 ## Config Resolution
 

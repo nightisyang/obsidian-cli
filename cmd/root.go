@@ -34,17 +34,25 @@ func Execute() int {
 
 	code := errs.ExitCode(err)
 	message := err.Error()
+	reason, hint := errs.DefaultReasonHint(code)
 	if code == errs.ExitGeneric {
 		if strings.Contains(message, "accepts") || strings.Contains(message, "unknown flag") || strings.Contains(message, "required flag") {
 			code = errs.ExitValidation
+			reason, hint = errs.DefaultReasonHint(code)
 		}
 	}
 	var appErr *errs.AppError
 	if errors.As(err, &appErr) {
 		message = appErr.Message
+		if appErr.Reason != "" {
+			reason = appErr.Reason
+		}
+		if appErr.Hint != "" {
+			hint = appErr.Hint
+		}
 	}
 	if rootOpts.json {
-		_ = output.WriteJSON(os.Stderr, output.Failure(code, message))
+		_ = output.WriteJSON(os.Stderr, output.FailureDetailed(code, reason, message, hint))
 	} else {
 		fmt.Fprintln(os.Stderr, message)
 	}
@@ -58,6 +66,9 @@ func newRootCmd() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			if shouldBypassRuntime(cmd) {
+				return nil
+			}
 			runtime, err := app.Build(cmd.Context(), app.Options{
 				Vault:   rootOpts.vault,
 				Config:  rootOpts.config,
@@ -87,11 +98,13 @@ func newRootCmd() *cobra.Command {
 	root.AddCommand(newPropCmd())
 	root.AddCommand(newTagCmd())
 	root.AddCommand(newSearchCmd())
+	root.AddCommand(newGraphCmd())
 	root.AddCommand(newLinksCmd())
 	root.AddCommand(newDailyCmd())
 	root.AddCommand(newTemplatesCmd())
 	root.AddCommand(newTemplateCmd())
 	root.AddCommand(newOpenCmd())
+	root.AddCommand(newListCmd())
 	root.AddCommand(newSyncCmd())
 	root.AddCommand(newTasksCmd())
 	root.AddCommand(newTaskCmd())
@@ -99,8 +112,29 @@ func newRootCmd() *cobra.Command {
 	root.AddCommand(newPluginsCmd())
 	root.AddCommand(newCommandsCmd())
 	root.AddCommand(newCommandCmd())
+	root.AddCommand(newPrintDefaultCmd())
+	root.AddCommand(newSchemaCmd(root))
+	root.AddCommand(newOpsCmd())
+	root.AddCommand(newSearchContentCmd())
+	root.SetHelpCommand(newHelpCmd(root))
 
 	return root
+}
+
+func shouldBypassRuntime(cmd *cobra.Command) bool {
+	if cmd == nil {
+		return false
+	}
+	if cmd.Name() == "help" || cmd.CalledAs() == "help" {
+		return true
+	}
+	if cmd.Name() == "schema" {
+		return true
+	}
+	if flag := cmd.Flags().Lookup("help"); flag != nil && flag.Changed {
+		return true
+	}
+	return false
 }
 
 func getRuntime(cmd *cobra.Command) (*app.Runtime, error) {

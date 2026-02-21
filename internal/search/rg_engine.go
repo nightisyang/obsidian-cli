@@ -1,10 +1,13 @@
 package search
 
 import (
-	"bytes"
 	"context"
+	"errors"
+	"fmt"
+	"io"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/nightisyang/obsidian-cli/internal/errs"
@@ -29,45 +32,73 @@ func (e *RGEngine) Search(ctx context.Context, q Query) ([]SearchResult, error) 
 		return fb.Search(ctx, q)
 	}
 
-	args := []string{"--json", "--line-number", "--glob", "*.md"}
+	args := []string{"--json", "--line-number", "--glob", "*.md", "--no-messages"}
+	if q.Limit > 0 {
+		args = append(args, "--max-count", strconv.Itoa(q.Limit))
+	}
 	if !q.CaseSensitive {
 		args = append(args, "-i")
 	}
 	args = append(args, q.Text, searchRoot)
-	cmd := exec.CommandContext(ctx, "rg", args...)
-	stdout := &bytes.Buffer{}
-	stderr := &bytes.Buffer{}
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
 
-	err = cmd.Run()
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	cmd := exec.CommandContext(runCtx, "rg", args...)
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			if exitErr.ExitCode() == 1 {
-				return []SearchResult{}, nil
-			}
-		}
-		message := strings.TrimSpace(stderr.String())
-		if message == "" {
-			message = err.Error()
-		}
-		return nil, errs.Wrap(errs.ExitGeneric, "ripgrep search failed", errWithMessage(message))
+		return nil, errs.Wrap(errs.ExitGeneric, "failed to capture ripgrep stdout", err)
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, errs.Wrap(errs.ExitGeneric, "failed to capture ripgrep stderr", err)
 	}
 
-	results, parseErr := ParseRGOutput(stdout, q.Context, q.Limit)
+	if err := cmd.Start(); err != nil {
+		return nil, errs.Wrap(errs.ExitGeneric, "failed to start ripgrep search", err)
+	}
+
+	results, limitReached, parseErr := ParseRGOutputStream(stdout, q.Context, q.Limit)
 	if parseErr != nil {
+		cancel()
+		_, _ = io.Copy(io.Discard, stderr)
+		_ = cmd.Wait()
 		return nil, parseErr
 	}
+
+	if limitReached {
+		cancel()
+	}
+
+	stderrBytes, _ := io.ReadAll(stderr)
+	waitErr := cmd.Wait()
+	if waitErr != nil {
+		// ripgrep exits 1 when no matches are found.
+		var exitErr *exec.ExitError
+		if errors.As(waitErr, &exitErr) && exitErr.ExitCode() == 1 {
+			return []SearchResult{}, nil
+		}
+		// Early cancellation after reaching limit is expected.
+		if limitReached && (errors.Is(waitErr, context.Canceled) || errors.Is(runCtx.Err(), context.Canceled)) {
+			waitErr = nil
+		}
+		if waitErr != nil {
+			message := strings.TrimSpace(string(stderrBytes))
+			if message == "" {
+				message = waitErr.Error()
+			}
+			return nil, errs.Wrap(errs.ExitGeneric, "ripgrep search failed", fmt.Errorf("%s", message))
+		}
+	}
+
 	for i := range results {
-		results[i].Path = filepath.ToSlash(strings.TrimPrefix(results[i].Path, e.VaultRoot+string(filepath.Separator)))
+		rel, relErr := filepath.Rel(e.VaultRoot, results[i].Path)
+		if relErr != nil {
+			continue
+		}
+		results[i].Path = filepath.ToSlash(rel)
 	}
 	return results, nil
-}
-
-type errWithMessage string
-
-func (e errWithMessage) Error() string {
-	return string(e)
 }
 
 func (e *RGEngine) resolveSearchRoot(pathPrefix string) (string, error) {

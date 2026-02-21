@@ -22,6 +22,10 @@ func (p *Printer) PrintJSONError(code int, message string) error {
 	return WriteJSON(os.Stderr, Failure(code, message))
 }
 
+func (p *Printer) PrintJSONErrorDetailed(code int, reason, message, hint string) error {
+	return WriteJSON(os.Stderr, FailureDetailed(code, reason, message, hint))
+}
+
 func (p *Printer) Println(line string) {
 	fmt.Fprintln(os.Stdout, line)
 }

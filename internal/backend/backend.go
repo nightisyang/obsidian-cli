@@ -59,6 +59,7 @@ type Backend interface {
 	Backlinks(ctx context.Context, path string, rebuild bool) ([]string, error)
 	PropGet(ctx context.Context, path, key string) (any, error)
 	PropSet(ctx context.Context, path, key string, value any) (note.Note, error)
+	PropDelete(ctx context.Context, path, key string) (note.Note, error)
 	PropList(ctx context.Context, path string) (map[string]any, error)
 	OpenInObsidian(ctx context.Context, path string, launch bool) (OpenResult, error)
 	SyncStatus(ctx context.Context) (SyncStatus, error)

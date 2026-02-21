@@ -12,8 +12,10 @@ type Envelope struct {
 }
 
 type ErrField struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
+	Code           int    `json:"code"`
+	Reason         string `json:"reason,omitempty"`
+	Message        string `json:"message"`
+	ActionableHint string `json:"actionable_hint,omitempty"`
 }
 
 func WriteJSON(w io.Writer, value any) error {
@@ -28,4 +30,16 @@ func Success(data any) Envelope {
 
 func Failure(code int, message string) Envelope {
 	return Envelope{OK: false, Error: &ErrField{Code: code, Message: message}}
+}
+
+func FailureDetailed(code int, reason, message, hint string) Envelope {
+	return Envelope{
+		OK: false,
+		Error: &ErrField{
+			Code:           code,
+			Reason:         reason,
+			Message:        message,
+			ActionableHint: hint,
+		},
+	}
 }

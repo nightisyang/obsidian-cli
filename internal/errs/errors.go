@@ -15,6 +15,8 @@ const (
 
 type AppError struct {
 	Code    int
+	Reason  string
+	Hint    string
 	Message string
 	Err     error
 }
@@ -31,11 +33,21 @@ func (e *AppError) Unwrap() error {
 }
 
 func New(code int, message string) error {
-	return &AppError{Code: code, Message: message}
+	reason, hint := DefaultReasonHint(code)
+	return &AppError{Code: code, Reason: reason, Hint: hint, Message: message}
 }
 
 func Wrap(code int, message string, err error) error {
-	return &AppError{Code: code, Message: message, Err: err}
+	reason, hint := DefaultReasonHint(code)
+	return &AppError{Code: code, Reason: reason, Hint: hint, Message: message, Err: err}
+}
+
+func NewDetailed(code int, reason, hint, message string) error {
+	return &AppError{Code: code, Reason: reason, Hint: hint, Message: message}
+}
+
+func WrapDetailed(code int, reason, hint, message string, err error) error {
+	return &AppError{Code: code, Reason: reason, Hint: hint, Message: message, Err: err}
 }
 
 func ExitCode(err error) int {
@@ -47,4 +59,17 @@ func ExitCode(err error) int {
 		return appErr.Code
 	}
 	return ExitGeneric
+}
+
+func DefaultReasonHint(code int) (string, string) {
+	switch code {
+	case ExitValidation:
+		return "validation_error", "Verify required arguments and flag values."
+	case ExitNotFound:
+		return "not_found", "Confirm the note/path/key exists in the selected vault."
+	case ExitConfig:
+		return "config_error", "Check --vault/--config values and local config files."
+	default:
+		return "runtime_error", "Retry with --json for structured output and inspect the failure envelope."
+	}
 }

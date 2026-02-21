@@ -68,6 +68,8 @@ func newTemplateReadCmd() *cobra.Command {
 func newTemplateInsertCmd() *cobra.Command {
 	var title string
 	var resolve bool
+	var dryRun bool
+	var ifHash string
 	cmd := &cobra.Command{
 		Use:   "insert <path> <name>",
 		Short: "Insert template into a note",
@@ -76,6 +78,32 @@ func newTemplateInsertCmd() *cobra.Command {
 			rt, err := getRuntime(cmd)
 			if err != nil {
 				return err
+			}
+			if err := verifyHashPrecondition(rt, args[0], ifHash); err != nil {
+				return err
+			}
+			if dryRun {
+				n, err := rt.Backend.GetNote(rt.Context, args[0])
+				if err != nil {
+					return err
+				}
+				tpl, err := rt.Backend.ReadTemplate(rt.Context, args[1], title, resolve)
+				if err != nil {
+					return err
+				}
+				if rt.Printer.JSON {
+					return rt.Printer.PrintJSON(map[string]any{
+						"dry_run":           true,
+						"action":            "template.insert",
+						"path":              n.Path,
+						"template":          args[1],
+						"insert_chars":      len(tpl.Content),
+						"current_hash":      hashString(n.Raw),
+						"resolved_template": resolve,
+					})
+				}
+				rt.Printer.Println("dry-run: would insert template " + args[1] + " into " + n.Path)
+				return nil
 			}
 			n, err := rt.Backend.InsertTemplate(rt.Context, args[0], args[1], title, resolve)
 			if err != nil {
@@ -90,5 +118,7 @@ func newTemplateInsertCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&title, "title", "", "Title for variable resolution")
 	cmd.Flags().BoolVar(&resolve, "resolve", true, "Resolve {{date}}, {{time}}, and {{title}}")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview operation without writing files")
+	cmd.Flags().StringVar(&ifHash, "if-hash", "", "Require current note SHA256 hash before writing")
 	return cmd
 }

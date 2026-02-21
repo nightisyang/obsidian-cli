@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -104,5 +105,35 @@ func TestBacklinksRebuildsWhenCacheIsStale(t *testing.T) {
 	}
 	if len(after) != 0 {
 		t.Fatalf("expected stale cache rebuild to remove backlinks, got %+v", after)
+	}
+}
+
+func TestPropDelete(t *testing.T) {
+	root := t.TempDir()
+	content := `---
+status: active
+topic: infra
+---
+
+hello`
+	if err := os.WriteFile(filepath.Join(root, "alpha.md"), []byte(content), 0o644); err != nil {
+		t.Fatalf("write note: %v", err)
+	}
+
+	b := NewNativeBackend(root, vault.DefaultConfig(), "native")
+	n, err := b.PropDelete(context.Background(), "alpha.md", "status")
+	if err != nil {
+		t.Fatalf("PropDelete error: %v", err)
+	}
+	if n.Path != "alpha.md" {
+		t.Fatalf("unexpected note path after PropDelete: %+v", n)
+	}
+
+	updated, err := os.ReadFile(filepath.Join(root, "alpha.md"))
+	if err != nil {
+		t.Fatalf("read updated note: %v", err)
+	}
+	if strings.Contains(string(updated), "status: active") {
+		t.Fatalf("expected status key to be removed, got %q", string(updated))
 	}
 }

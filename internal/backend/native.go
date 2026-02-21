@@ -217,6 +217,20 @@ func (b *NativeBackend) PropSet(_ context.Context, path, key string, value any) 
 	return note.Write(b.vaultRoot, n.Path, n, false, now())
 }
 
+func (b *NativeBackend) PropDelete(_ context.Context, path, key string) (note.Note, error) {
+	n, err := note.Get(b.vaultRoot, path)
+	if err != nil {
+		return note.Note{}, err
+	}
+	values := frontmatter.FrontmatterToMap(n.Frontmatter)
+	if _, ok := values[key]; !ok {
+		return note.Note{}, errs.New(errs.ExitNotFound, "property not found")
+	}
+	delete(values, key)
+	n.Frontmatter = frontmatter.MapToFrontmatter(values)
+	return note.Write(b.vaultRoot, n.Path, n, false, now())
+}
+
 func (b *NativeBackend) PropList(_ context.Context, path string) (map[string]any, error) {
 	n, err := note.Get(b.vaultRoot, path)
 	if err != nil {
