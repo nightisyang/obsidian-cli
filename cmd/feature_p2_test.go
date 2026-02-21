@@ -63,7 +63,6 @@ func resetRootOptsForTest() {
 	rootOpts.mode = ""
 	rootOpts.json = false
 	rootOpts.quiet = false
-	rootOpts.timeout = 0
 }
 
 func parseEnvelope(t *testing.T, raw string) testEnvelope {

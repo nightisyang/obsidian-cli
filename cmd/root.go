@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/nightisyang/obsidian-cli/internal/app"
 	"github.com/nightisyang/obsidian-cli/internal/errs"
@@ -17,12 +16,11 @@ import (
 type runtimeKey struct{}
 
 var rootOpts struct {
-	vault   string
-	config  string
-	mode    string
-	json    bool
-	quiet   bool
-	timeout time.Duration
+	vault  string
+	config string
+	mode   string
+	json   bool
+	quiet  bool
 }
 
 func Execute() int {
@@ -70,12 +68,11 @@ func newRootCmd() *cobra.Command {
 				return nil
 			}
 			runtime, err := app.Build(cmd.Context(), app.Options{
-				Vault:   rootOpts.vault,
-				Config:  rootOpts.config,
-				Mode:    rootOpts.mode,
-				JSON:    rootOpts.json,
-				Quiet:   rootOpts.quiet,
-				Timeout: rootOpts.timeout,
+				Vault:  rootOpts.vault,
+				Config: rootOpts.config,
+				Mode:   rootOpts.mode,
+				JSON:   rootOpts.json,
+				Quiet:  rootOpts.quiet,
 			})
 			if err != nil {
 				return err
@@ -91,7 +88,6 @@ func newRootCmd() *cobra.Command {
 	root.PersistentFlags().StringVar(&rootOpts.mode, "mode", "", "Mode: native|api|auto")
 	root.PersistentFlags().BoolVar(&rootOpts.json, "json", false, "JSON output")
 	root.PersistentFlags().BoolVar(&rootOpts.quiet, "quiet", false, "Quiet human output")
-	root.PersistentFlags().DurationVar(&rootOpts.timeout, "timeout", 5*time.Second, "Command timeout")
 
 	root.AddCommand(newVaultCmd())
 	root.AddCommand(newNoteCmd())
@@ -113,6 +109,7 @@ func newRootCmd() *cobra.Command {
 	root.AddCommand(newCommandsCmd())
 	root.AddCommand(newCommandCmd())
 	root.AddCommand(newPrintDefaultCmd())
+	root.AddCommand(newAgentCmd())
 	root.AddCommand(newSchemaCmd(root))
 	root.AddCommand(newOpsCmd())
 	root.AddCommand(newSearchContentCmd())
@@ -129,6 +126,9 @@ func shouldBypassRuntime(cmd *cobra.Command) bool {
 		return true
 	}
 	if cmd.Name() == "schema" {
+		return true
+	}
+	if cmd.Name() == "agent" {
 		return true
 	}
 	if flag := cmd.Flags().Lookup("help"); flag != nil && flag.Changed {

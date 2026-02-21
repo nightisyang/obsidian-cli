@@ -5,8 +5,9 @@ import "github.com/spf13/cobra"
 func newNoteDailyCmd() *cobra.Command {
 	var date string
 	cmd := &cobra.Command{
-		Use:   "daily",
-		Short: "Open or create daily note (alias of `daily`)",
+		Use:    "daily",
+		Short:  "Open or create daily note (alias of `daily`)",
+		Hidden: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			rt, err := getRuntime(cmd)
 			if err != nil {

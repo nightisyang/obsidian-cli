@@ -55,9 +55,10 @@ func newSearchContentCmd() *cobra.Command {
 	var strict bool
 
 	cmd := &cobra.Command{
-		Use:   "search-content <query>",
-		Short: "Search note content for text",
-		Args:  cobra.ExactArgs(1),
+		Use:    "search-content <query>",
+		Short:  "Search note content for text",
+		Hidden: true,
+		Args:   cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runSearch(cmd, args[0], "", "", limit, contextChars, pathPrefix, caseSensitive, maxChars, withMeta, strict)
 		},

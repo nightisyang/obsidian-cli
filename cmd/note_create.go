@@ -10,6 +10,7 @@ import (
 
 func newNoteCreateCmd() *cobra.Command {
 	var template string
+	var content string
 	var tags []string
 	var dir string
 	var kind string
@@ -62,6 +63,7 @@ func newNoteCreateCmd() *cobra.Command {
 			created, err := rt.Backend.CreateNote(rt.Context, note.CreateInput{
 				Title:    args[0],
 				Template: template,
+				Content:  content,
 				Tags:     tags,
 				Dir:      dir,
 				Kind:     kind,
@@ -87,6 +89,7 @@ func newNoteCreateCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&template, "template", "", "Template name")
+	cmd.Flags().StringVar(&content, "content", "", "Initial note body content")
 	cmd.Flags().StringSliceVar(&tags, "tag", nil, "Add tag (repeatable)")
 	cmd.Flags().StringVar(&dir, "dir", "", "Destination directory")
 	cmd.Flags().StringVar(&kind, "kind", "", "Note kind")

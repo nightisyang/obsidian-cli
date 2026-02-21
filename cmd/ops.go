@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 
 	"github.com/nightisyang/obsidian-cli/internal/app"
 	"github.com/nightisyang/obsidian-cli/internal/errs"
@@ -44,14 +42,13 @@ func newOpsCmd() *cobra.Command {
 }
 
 func newOpsApplyCmd() *cobra.Command {
-	var rollback bool
 	var continueOnError bool
 	var dryRun bool
 
 	cmd := &cobra.Command{
 		Use:   "apply <spec.json>",
 		Short: "Apply a batch of CLI operations from JSON",
-		Long:  "JSON format:\n{\n  \"ops\": [\n    {\"id\": \"1\", \"args\": [\"note\", \"append\", \"daily.md\", \"- [ ] follow up\"], \"expect\": {\"ok\": \"true\", \"data.path\": \"daily.md\"}}\n  ]\n}",
+		Long:  "JSON format:\n{\n  \"ops\": [\n    {\"id\": \"1\", \"args\": [\"note\", \"append\", \"daily.md\", \"- [ ] follow up\"], \"expect\": {\"ok\": \"true\", \"data.path\": \"daily.md\"}}\n  ]\n}\n\nOperations run in order. On failure, succeeded and failed operations are reported; no automatic rollback is performed.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			rt, err := getRuntime(cmd)
@@ -78,18 +75,6 @@ func newOpsApplyCmd() *cobra.Command {
 				return nil
 			}
 
-			snapshotDir := ""
-			if rollback {
-				snapshotDir, err = os.MkdirTemp("", "obsidian-cli-ops-snapshot-*")
-				if err != nil {
-					return errs.Wrap(errs.ExitGeneric, "failed to create rollback snapshot dir", err)
-				}
-				defer os.RemoveAll(snapshotDir)
-				if err := copyDir(rt.VaultRoot, snapshotDir); err != nil {
-					return errs.Wrap(errs.ExitGeneric, "failed to create rollback snapshot", err)
-				}
-			}
-
 			results := []opsResult{}
 			failed := false
 			for _, op := range spec.Ops {
@@ -103,30 +88,35 @@ func newOpsApplyCmd() *cobra.Command {
 				}
 			}
 
-			rolledBack := false
-			if failed && rollback {
-				if err := restoreSnapshot(snapshotDir, rt.VaultRoot); err != nil {
-					return errs.Wrap(errs.ExitGeneric, "failed to rollback after batch failure", err)
+			succeededOps := make([]opsResult, 0, len(results))
+			failedOps := make([]opsResult, 0)
+			for _, result := range results {
+				if result.OK {
+					succeededOps = append(succeededOps, result)
+				} else {
+					failedOps = append(failedOps, result)
 				}
-				rolledBack = true
 			}
 
 			if rt.Printer.JSON {
 				return rt.Printer.PrintJSON(map[string]any{
-					"results":     results,
-					"failed":      failed,
-					"rolled_back": rolledBack,
+					"results":       results,
+					"failed":        failed,
+					"succeeded_ops": succeededOps,
+					"failed_ops":    failedOps,
 				})
 			}
-			for _, result := range results {
-				if result.OK {
-					rt.Printer.Println(fmt.Sprintf("ok: %v", result.Args))
-				} else {
-					rt.Printer.Println(fmt.Sprintf("failed: %v (%s)", result.Args, result.Error))
+			if len(succeededOps) > 0 {
+				rt.Printer.Println("succeeded operations:")
+				for _, result := range succeededOps {
+					rt.Printer.Println(fmt.Sprintf("- %v", result.Args))
 				}
 			}
-			if rolledBack {
-				rt.Printer.Println("rollback: restored vault snapshot")
+			if len(failedOps) > 0 {
+				rt.Printer.Println("failed operations:")
+				for _, result := range failedOps {
+					rt.Printer.Println(fmt.Sprintf("- %v (%s)", result.Args, result.Error))
+				}
 			}
 			if failed {
 				return errs.New(errs.ExitGeneric, "batch apply failed")
@@ -135,7 +125,6 @@ func newOpsApplyCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVar(&rollback, "rollback", false, "Restore vault snapshot if any operation fails")
 	cmd.Flags().BoolVar(&continueOnError, "continue-on-error", false, "Continue applying operations after a failure")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview operation list without executing")
 	return cmd
@@ -262,56 +251,4 @@ func splitPath(path string) []string {
 		out = append(out, part)
 	}
 	return out
-}
-
-func copyDir(src, dst string) error {
-	return filepath.WalkDir(src, func(path string, d os.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		rel, err := filepath.Rel(src, path)
-		if err != nil {
-			return err
-		}
-		target := filepath.Join(dst, rel)
-		if d.IsDir() {
-			return os.MkdirAll(target, 0o755)
-		}
-		return copyFile(path, target)
-	})
-}
-
-func restoreSnapshot(snapshot, target string) error {
-	entries, err := os.ReadDir(target)
-	if err != nil {
-		return err
-	}
-	for _, entry := range entries {
-		if rmErr := os.RemoveAll(filepath.Join(target, entry.Name())); rmErr != nil {
-			return rmErr
-		}
-	}
-	return copyDir(snapshot, target)
-}
-
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-		return err
-	}
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	if _, err := io.Copy(out, in); err != nil {
-		return err
-	}
-	return out.Close()
 }
